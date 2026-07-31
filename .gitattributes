@@ -1,0 +1,5 @@
+# The version string corpus contains 7,381 entries with significant trailing whitespace. Pin the line endings and
+# disable whitespace checks so no tool strips them, which would silently collapse those entries into duplicates and
+# shrink the coverage of VersionStringsTest. The test asserts the corpus size and distinctness to catch it if it ever
+# does happen.
+src/test/resources/version-strings.txt text eol=lf -whitespace

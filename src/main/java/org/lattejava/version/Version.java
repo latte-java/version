@@ -13,8 +13,8 @@ import org.lattejava.version.Version.PreRelease.PreReleasePart.*;
  * This class models a simple three number version as well as any free form version String. It has two modes of
  * operation, strict and relaxed.
  * <p>
- * When this class is constructed, it tries everything in its power to figure out what the heck a version string is.
- * It strictly supports SemVer and will fail if passed a non-SemVer String.
+ * When this class is constructed, it tries everything in its power to figure out what the heck a version string is. It
+ * strictly supports SemVer and will fail if passed a non-SemVer String.
  * <p>
  * <a href="http://semver.org">http://semver.org</a>
  * <p>
@@ -29,7 +29,7 @@ import org.lattejava.version.Version.PreRelease.PreReleasePart.*;
  *
  * @author Brian Pontarelli
  */
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused", "UnusedReturnValue"})
 public record Version(int major, int minor, int patch, PreRelease preRelease, String metaData) implements Comparable<Version> {
   public static final String INTEGRATION = "{integration}";
 
@@ -107,7 +107,7 @@ public record Version(int major, int minor, int patch, PreRelease preRelease, St
           }
 
           break;
-        } else if (Character.isDigit(c)) {
+        } else if (c >= '0' && c <= '9') {
           num.append(c);
         } else {
           throw new VersionException("Invalid Semantic Version string [" + version + "]. Alphabetic characters are not allowed in the initial version string.");
@@ -219,6 +219,16 @@ public record Version(int major, int minor, int patch, PreRelease preRelease, St
   }
 
   /**
+   * Computes the hash code for this Version. This explicitly excludes MetaData in order to stay consistent with
+   * {@link #equals(Object)}, which excludes it per the SemVer specification.
+   *
+   * @return The hash code.
+   */
+  public int hashCode() {
+    return Objects.hash(major, minor, patch, preRelease);
+  }
+
+  /**
    * Performs semantic version compatibility checking. If this version is on the 0.x line, than the other version has to
    * be on the same minor line (e.g. 0.3 is not compatible with 0.4). Otherwise, the two versions have to be on the same
    * major line (e.g. 1.0 is not compatible with 2.0).
@@ -274,14 +284,14 @@ public record Version(int major, int minor, int patch, PreRelease preRelease, St
       return this;
     }
 
-    PreRelease integrationPreRelease = new PreRelease();
+    List<PreRelease.PreReleasePart> parts = new ArrayList<>();
     if (preRelease != null) {
-      integrationPreRelease.parts.addAll(preRelease.parts);
+      parts.addAll(preRelease.parts);
     }
 
-    integrationPreRelease.parts.add(new StringPreReleasePart(INTEGRATION));
+    parts.add(new StringPreReleasePart(INTEGRATION));
 
-    return new Version(major, minor, patch, integrationPreRelease, metaData);
+    return new Version(major, minor, patch, new PreRelease(parts.toArray(new PreRelease.PreReleasePart[0])), metaData);
   }
 
   /**
@@ -296,25 +306,93 @@ public record Version(int major, int minor, int patch, PreRelease preRelease, St
   /**
    * Models the PreRelease portion of the Semantic Version String.
    *
+   * @param parts The parts of this PreRelease. This List is immutable and never contains a null element.
    * @author Brian Pontarelli
    */
-  public static class PreRelease implements Comparable<PreRelease> {
-    public final List<PreReleasePart> parts = new ArrayList<>();
-
+  public record PreRelease(List<PreReleasePart> parts) implements Comparable<PreRelease> {
+    /**
+     * Constructs a PreRelease from the given parts.
+     *
+     * @param parts The parts. Must contain at least one part and must not contain a null part.
+     * @throws VersionException If the parts are null, empty, or contain a null part.
+     */
     public PreRelease(PreReleasePart... parts) {
-      Collections.addAll(this.parts, parts);
+      if (parts == null || parts.length == 0) {
+        throw new VersionException("Invalid Semantic Version PreRelease (it did not contain any parts).");
+      }
+
+      for (PreReleasePart part : parts) {
+        if (part == null) {
+          throw new VersionException("Invalid Semantic Version PreRelease (it contained a null part).");
+        }
+      }
+
+      this(List.of(parts));
     }
 
+    /**
+     * Constructs a PreRelease by parsing the given String.
+     *
+     * @param spec The PreRelease String to parse.
+     * @throws VersionException If the string is null, blank, or incorrectly formatted.
+     */
     public PreRelease(String spec) {
+      this(parse(spec));
+    }
+
+    private static void addPart(List<PreReleasePart> parts, String part) {
+      if (part.isEmpty()) {
+        return;
+      }
+
+      if (!isNumeric(part)) {
+        parts.add(new StringPreReleasePart(part));
+        return;
+      }
+
+      if (part.length() > 1 && part.charAt(0) == '0') {
+        throw new VersionException("Invalid Semantic Version PreRelease part [" + part + "]. Numeric parts must not have leading zeros.");
+      }
+
+      try {
+        parts.add(new NumberPreReleasePart(Integer.parseInt(part)));
+      } catch (NumberFormatException e) {
+        throw new VersionException("Invalid Semantic Version PreRelease part [" + part + "]. Numeric parts must fit in a 32 bit signed integer.", e);
+      }
+    }
+
+    /**
+     * Determines if the given String is a SemVer numeric identifier. {@code Character.isDigit()} is deliberately not
+     * used here because it accepts non-ASCII digits, which SemVer does not allow.
+     *
+     * @param str The String to check.
+     * @return True if the String consists entirely of ASCII digits.
+     */
+    private static boolean isNumeric(String str) {
+      for (int i = 0; i < str.length(); i++) {
+        char c = str.charAt(i);
+        if (c < '0' || c > '9') {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    private static PreReleasePart[] parse(String spec) {
+      if (spec == null || spec.isBlank()) {
+        throw new VersionException("Invalid Semantic Version PreRelease string (it was null or empty).");
+      }
+
       char start = spec.charAt(0);
       char end = spec.charAt(spec.length() - 1);
       if (start == '.' || start == '-' || start == '+' || end == '.' || end == '-' || end == '+') {
         throw new VersionException("Invalid Semantic Version PreRelease string [" + spec + "]. PreRelease Version strings should not begin or end with . - or +");
       }
 
+      List<PreReleasePart> parts = new ArrayList<>();
       StringBuilder part = new StringBuilder();
-      int i = 0;
-      for (; i < spec.length(); i++) {
+      for (int i = 0; i < spec.length(); i++) {
         char c = spec.charAt(i);
         if (c == '.') {
           if (part.isEmpty()) {
@@ -325,13 +403,17 @@ public record Version(int major, int minor, int patch, PreRelease preRelease, St
             throw new VersionException("Invalid Semantic Version PreRelease string [" + spec + "]. The {integration} indicator must be the last PreRelease part.");
           }
 
-          addPart(part);
+          String partStr = part.toString();
+          part.setLength(0);
+          addPart(parts, partStr);
         } else {
           part.append(c);
         }
       }
 
-      addPart(part);
+      addPart(parts, part.toString());
+
+      return parts.toArray(new PreReleasePart[0]);
     }
 
     @Override
@@ -373,11 +455,6 @@ public record Version(int major, int minor, int patch, PreRelease preRelease, St
       return parts.equals(that.parts);
     }
 
-    @Override
-    public int hashCode() {
-      return parts.hashCode();
-    }
-
     /**
      * @return True if the PreRelease contains a part that is an integration indicator. This part must be the last part.
      */
@@ -388,22 +465,6 @@ public record Version(int major, int minor, int patch, PreRelease preRelease, St
     @Override
     public String toString() {
       return parts.stream().map(Object::toString).collect(Collectors.joining("."));
-    }
-
-    private void addPart(StringBuilder part) {
-      if (part.isEmpty()) {
-        return;
-      }
-
-      String partStr = part.toString();
-      try {
-        int value = Integer.parseInt(partStr);
-        parts.add(new NumberPreReleasePart(value));
-      } catch (NumberFormatException e) {
-        parts.add(new StringPreReleasePart(partStr));
-      }
-
-      part.setLength(0);
     }
 
     /**
@@ -433,7 +494,7 @@ public record Version(int major, int minor, int patch, PreRelease preRelease, St
             return -1;
           }
 
-          return value - ((NumberPreReleasePart) o).value;
+          return Integer.compare(value, ((NumberPreReleasePart) o).value);
         }
 
         @Override
@@ -456,6 +517,16 @@ public record Version(int major, int minor, int patch, PreRelease preRelease, St
        * A String part of the PreRelease portion of the Semantic Version String.
        */
       record StringPreReleasePart(String value) implements PreReleasePart {
+        /**
+         * @param value The value of this part.
+         * @throws VersionException If the value is null or blank.
+         */
+        public StringPreReleasePart {
+          if (value == null || value.isBlank()) {
+            throw new VersionException("Invalid Semantic Version PreRelease part (it was null or empty).");
+          }
+        }
+
         @Override
         public int compareTo(PreReleasePart o) {
           if (o instanceof NumberPreReleasePart) {
