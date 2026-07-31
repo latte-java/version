@@ -62,26 +62,60 @@ public record Version(int major, int minor, int patch, PreRelease preRelease, St
    *                          proper pre-release or meta-data information).
    */
   public Version(String version) {
-    char start = version.charAt(0);
-    char end = version.charAt(version.length() - 1);
-    if (start == '.' || start == '-' || start == '+' || end == '.' || end == '-' || end == '+') {
-      throw new VersionException("Invalid Semantic Version string [" + version + "]. Version strings should not begin or end with . - or +");
+    if (version == null || version.isBlank()) {
+      throw new VersionException("Invalid Semantic Version string (it was null or empty).");
     }
 
-    StringBuilder num = new StringBuilder();
     Integer major = null;
     Integer minor = null;
     Integer patch = null;
+    PreRelease preRelease = null;
+    String metaData = null;
+    try {
+      version = version.trim();
+      char start = version.charAt(0);
+      char end = version.charAt(version.length() - 1);
+      if (start == '.' || start == '-' || start == '+' || end == '.' || end == '-' || end == '+') {
+        throw new VersionException("Invalid Semantic Version string [" + version + "]. Version strings should not begin or end with . - or +");
+      }
 
-    // Number loop
-    int i = 0;
-    for (; i < version.length(); i++) {
-      char c = version.charAt(i);
-      if (c == '.') {
-        if (num.isEmpty()) {
-          throw new VersionException("Invalid Semantic Version string [" + version + "]. Two version delimiters should not be next to each other.");
+      StringBuilder num = new StringBuilder();
+
+      // Number loop
+      int i = 0;
+      for (; i < version.length(); i++) {
+        char c = version.charAt(i);
+        if (c == '.') {
+          if (num.isEmpty()) {
+            throw new VersionException("Invalid Semantic Version string [" + version + "]. Two version delimiters should not be next to each other.");
+          }
+
+          if (major == null) {
+            major = Integer.parseInt(num.toString());
+          } else if (minor == null) {
+            minor = Integer.parseInt(num.toString());
+          } else if (patch == null) {
+            patch = Integer.parseInt(num.toString());
+          } else {
+            throw new VersionException("Invalid Semantic Version string [" + version + "]. A version can only have at most 3 dotted parts <major>.<minor>.<patch>");
+          }
+
+          num.setLength(0);
+        } else if (c == '-' || c == '+') {
+          if (num.isEmpty()) {
+            throw new VersionException("Invalid Semantic Version string [" + version + "]. Two version delimiters should not be next to each other.");
+          }
+
+          break;
+        } else if (Character.isDigit(c)) {
+          num.append(c);
+        } else {
+          throw new VersionException("Invalid Semantic Version string [" + version + "]. Alphabetic characters are not allowed in the initial version string.");
         }
+      }
 
+      // Handle the final value
+      if (!num.isEmpty()) {
         if (major == null) {
           major = Integer.parseInt(num.toString());
         } else if (minor == null) {
@@ -91,44 +125,21 @@ public record Version(int major, int minor, int patch, PreRelease preRelease, St
         } else {
           throw new VersionException("Invalid Semantic Version string [" + version + "]. A version can only have at most 3 dotted parts <major>.<minor>.<patch>");
         }
-
-        num.setLength(0);
-      } else if (c == '-' || c == '+') {
-        if (num.isEmpty()) {
-          throw new VersionException("Invalid Semantic Version string [" + version + "]. Two version delimiters should not be next to each other.");
-        }
-
-        break;
-      } else if (Character.isDigit(c)) {
-        num.append(c);
-      } else {
-        throw new VersionException("Invalid Semantic Version string [" + version + "]. Alphabetic characters are not allowed in the initial version string.");
       }
-    }
 
-    // Handle the final value
-    if (!num.isEmpty()) {
-      if (major == null) {
-        major = Integer.parseInt(num.toString());
-      } else if (minor == null) {
-        minor = Integer.parseInt(num.toString());
-      } else if (patch == null) {
-        patch = Integer.parseInt(num.toString());
-      } else {
-        throw new VersionException("Invalid Semantic Version string [" + version + "]. A version can only have at most 3 dotted parts <major>.<minor>.<patch>");
+      // Pre-release and meta
+      int plus = version.indexOf('+', i);
+      if (i < version.length() && version.charAt(i) == '-') {
+        preRelease = new PreRelease((plus == -1) ? version.substring(i + 1) : version.substring(i + 1, plus));
       }
-    }
 
-    // Pre-release and meta
-    PreRelease preRelease = null;
-    int plus = version.indexOf('+', i);
-    if (i < version.length() && version.charAt(i) == '-') {
-      preRelease = new PreRelease((plus == -1) ? version.substring(i + 1) : version.substring(i + 1, plus));
-    }
-
-    String metaData = null;
-    if (plus != -1) {
-      metaData = version.substring(plus + 1);
+      if (plus != -1) {
+        metaData = version.substring(plus + 1);
+      }
+    } catch (VersionException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new VersionException("Invalid Semantic Version string [" + version + "]. See the `Caused by` stacktrace for the reason why.", e);
     }
 
     this(major != null ? major : 0, minor != null ? minor : 0, patch != null ? patch : 0, preRelease, metaData);

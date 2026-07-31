@@ -2,7 +2,7 @@
  * Copyright (c) 2026 The Latte Project
  * SPDX-License-Identifier: MIT
  */
-project(group: "org.lattejava", name: "version", version: "0.6.0", licenses: ["MIT"]) {
+project(group: "org.lattejava", name: "version", version: "0.6.1", licenses: ["MIT"]) {
   workflow {
     standard()
   }
@@ -22,11 +22,11 @@ project(group: "org.lattejava", name: "version", version: "0.6.0", licenses: ["M
 }
 
 // Plugins
-dependency = loadPlugin(id: "org.lattejava.plugin:dependency:0.4.0")
-idea = loadPlugin(id: "org.lattejava.plugin:idea:0.4.1")
-java = loadPlugin(id: "org.lattejava.plugin:java:0.4.4")
-javaTestNG = loadPlugin(id: "org.lattejava.plugin:java-testng:0.4.0")
-release = loadPlugin(id: "org.lattejava.plugin:release-git:0.4.0")
+dependency = loadPlugin(id: "org.lattejava.plugin:dependency:0.6.0")
+idea = loadPlugin(id: "org.lattejava.plugin:idea:0.6.0")
+java = loadPlugin(id: "org.lattejava.plugin:java:0.6.0")
+javaTestNG = loadPlugin(id: "org.lattejava.plugin:java-testng:0.6.0")
+release = loadPlugin(id: "org.lattejava.plugin:release-git:0.6.0")
 
 // Plugin settings
 java.settings.javaVersion = "25"

@@ -14,6 +14,7 @@ import org.testng.annotations.*;
 
 import static java.util.Arrays.*;
 import static org.testng.Assert.*;
+import static org.testng.Assert.fail;
 
 /**
  * Version Tester.
@@ -103,20 +104,20 @@ public class VersionTest {
 
     try {
       new Version(-1, 0, 0, null, null);
-      Assert.fail("Should have failed");
+      fail("Should have failed");
     } catch (Exception _) {
       // Ignored
     }
 
     try {
       new Version(0, -1, 0, null, null);
-      Assert.fail("Should have failed");
+      fail("Should have failed");
     } catch (Exception _) {
     }
 
     try {
       new Version(0, 0, -1, null, null);
-      Assert.fail("Should have failed");
+      fail("Should have failed");
     } catch (Exception _) {
     }
   }
@@ -204,8 +205,11 @@ public class VersionTest {
   private void assertBadVersion(String spec) {
     try {
       new Version(spec);
-      Assert.fail("Should have failed");
-    } catch (Exception _) {
+      fail("Should have failed with only a VersionException");
+    } catch (VersionException _) {
+      // Expected
+    } catch (Exception e) {
+      fail("Should have failed with only a VersionException", e);
     }
   }
 
